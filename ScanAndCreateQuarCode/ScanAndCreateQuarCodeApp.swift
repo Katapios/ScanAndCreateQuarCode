@@ -11,7 +11,7 @@ import SwiftUI
 struct ScanAndCreateQuarCodeApp: App {
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            RootView()
         }
     }
 }
