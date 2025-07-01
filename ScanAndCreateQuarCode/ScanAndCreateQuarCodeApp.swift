@@ -9,9 +9,14 @@ import SwiftUI
 
 @main
 struct ScanAndCreateQuarCodeApp: App {
+    @StateObject private var codeStore = QRCodeStore()
+    @StateObject private var scanStore = QRScanStore()  // 👈 обязательно
+
     var body: some Scene {
         WindowGroup {
             RootView()
+                .environmentObject(codeStore)
+                .environmentObject(scanStore)   // 👈 ВАЖНО: передаём сюда
         }
     }
 }

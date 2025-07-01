@@ -7,158 +7,137 @@
 
 import SwiftUI
 import AVFoundation
+import PhotosUI
 
 struct QRScannerView: View {
+    @EnvironmentObject private var scanStore: QRScanStore
     @StateObject private var viewModel = QRScannerViewModel()
-    @State private var scannedItems: [String] = []
-    
+
+    // UI-состояния
+    @State private var editingItem: QRCodeItem?
+    @State private var showDeleteSheet = false
+    @State private var sharePayload: SharePayload?        // для share-sheet
+
+    private var hasSelection: Bool { scanStore.items.contains { $0.isSelected } }
+
     var body: some View {
-        VStack {
-            // Превью камеры
-            ZStack {
-                QRScannerRepresentable(scannedCode: $viewModel.scannedCode)
-                    .frame(height: 300)
-                    .cornerRadius(12)
-                    .padding()
-                
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(Color.blue, lineWidth: 2)
-                    .frame(height: 300)
-                    .padding()
+        NavigationStack {
+            VStack(spacing: 0) {
+                cameraPreview
+                Divider()
+                actionButtons
+                codesScroll
             }
-            
-            // Лента отсканированных кодов
-            List(scannedItems.reversed(), id: \.self) { item in
-                Text(item)
-                    .padding()
-                    .contextMenu {
-                        Button(action: {
-                            UIPasteboard.general.string = item
-                        }) {
-                            Label("Копировать", systemImage: "doc.on.doc")
+            .navigationTitle("QR Сканер")
+            .toolbar { trailingToolbar }
+            .sheet(item: $editingItem) { item in
+                // можем переиспользовать уже готовый редактор
+                EditQRItemView(item: item, store: scanStore)
+            }
+            .sheet(item: $sharePayload) { payload in
+                ActivityView(items: payload.items)
+            }
+            .confirmationDialog("Удалить выбранные QR-коды?",
+                                isPresented: $showDeleteSheet,
+                                titleVisibility: .visible) {
+                Button("Удалить", role: .destructive, action: scanStore.deleteSelected)
+            }
+        }
+        .onChange(of: viewModel.scannedCode) { addScanned($0) }
+        .onAppear { viewModel.checkCameraAuthorization() }
+    }
+
+    // MARK: UI-секции ---------------------------------------------------------
+
+    private var cameraPreview: some View {
+        ZStack {
+            QRScannerRepresentable(scannedCode: $viewModel.scannedCode)
+                .frame(height: 300)
+                .cornerRadius(12)
+                .padding()
+
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(Color.blue, lineWidth: 2)
+                .frame(height: 300)
+                .padding()
+
+            VStack {
+                Spacer()
+                Text(viewModel.statusMessage)
+                    .foregroundColor(viewModel.statusColor)
+                    .padding(.bottom, 12)
+            }
+        }
+    }
+
+    private var actionButtons: some View {
+        HStack {
+            Button("Выбрать все",  action: scanStore.selectAll).font(.caption)
+            Button("Снять выбор",  action: scanStore.deselectAll).font(.caption)
+        }
+        .padding(.vertical, 8)
+        .opacity(scanStore.items.isEmpty ? 0 : 1)
+    }
+
+    private var codesScroll: some View {
+        ScrollView {
+            LazyVStack {
+                ForEach(scanStore.items) { item in
+                    QRCodeRow(item: item,
+                              isSelected: Binding(
+                                get: { item.isSelected },
+                                set: { scanStore.set(item.id, selected: $0) }),
+                              onEdit: { editingItem = item })
+                    .onAppear {
+                        if item.id == scanStore.items.last?.id { scanStore.loadMore() }
+                    }
+                    .swipeActions {
+                        Button(role: .destructive) { scanStore.delete(item.id) } label: {
+                            Label("Удалить", systemImage: "trash")
                         }
                     }
-            }
-            .listStyle(.plain)
-            
-            // Статус сканирования
-            Text(viewModel.statusMessage)
-                .foregroundColor(viewModel.statusColor)
-                .padding()
-        }
-        .navigationTitle("QR Сканер")
-        .onChange(of: viewModel.scannedCode) { newValue in
-            if let code = newValue, !scannedItems.contains(code) {
-                scannedItems.append(code)
-                viewModel.scannedCode = nil // Сбрасываем для нового сканирования
-                UINotificationFeedbackGenerator().notificationOccurred(.success)
-            }
-        }
-        .onAppear {
-            viewModel.checkCameraAuthorization()
-        }
-    }
-}
-
-// MARK: - ViewModel
-class QRScannerViewModel: ObservableObject {
-    @Published var scannedCode: String?
-    @Published var statusMessage = "Наведите камеру на QR-код"
-    @Published var statusColor: Color = .primary
-    
-    func checkCameraAuthorization() {
-        switch AVCaptureDevice.authorizationStatus(for: .video) {
-        case .authorized:
-            statusMessage = "Камера доступна"
-            statusColor = .green
-        case .notDetermined:
-            requestCameraAccess()
-        case .denied, .restricted:
-            statusMessage = "Нет доступа к камере. Проверьте настройки."
-            statusColor = .red
-        @unknown default:
-            statusMessage = "Неизвестный статус доступа"
-            statusColor = .orange
-        }
-    }
-    
-    private func requestCameraAccess() {
-        AVCaptureDevice.requestAccess(for: .video) { granted in
-            DispatchQueue.main.async {
-                if granted {
-                    self.statusMessage = "Камера доступна"
-                    self.statusColor = .green
-                } else {
-                    self.statusMessage = "Доступ к камере запрещен"
-                    self.statusColor = .red
                 }
             }
         }
     }
-}
 
-// MARK: - UIKit Representable
-struct QRScannerRepresentable: UIViewRepresentable {
-    @Binding var scannedCode: String?
-    
-    func makeUIView(context: Context) -> UIView {
-        let view = UIView()
-        let session = AVCaptureSession()
-        
-        guard let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back),
-              let input = try? AVCaptureDeviceInput(device: device) else {
-            return view
-        }
-        
-        if session.canAddInput(input) {
-            session.addInput(input)
-        }
-        
-        let output = AVCaptureMetadataOutput()
-        if session.canAddOutput(output) {
-            session.addOutput(output)
-            output.setMetadataObjectsDelegate(context.coordinator, queue: DispatchQueue.main)
-            output.metadataObjectTypes = [.qr]
-        }
-        
-        let previewLayer = AVCaptureVideoPreviewLayer(session: session)
-        previewLayer.videoGravity = .resizeAspectFill
-        previewLayer.frame = view.layer.bounds
-        view.layer.addSublayer(previewLayer)
-        
-        DispatchQueue.global(qos: .userInitiated).async {
-            session.startRunning()
-        }
-        
-        return view
-    }
-    
-    func updateUIView(_ uiView: UIView, context: Context) {}
-    
-    func makeCoordinator() -> Coordinator {
-        Coordinator(scannedCode: $scannedCode)
-    }
-    
-    class Coordinator: NSObject, AVCaptureMetadataOutputObjectsDelegate {
-        @Binding var scannedCode: String?
-        
-        init(scannedCode: Binding<String?>) {
-            self._scannedCode = scannedCode
-        }
-        
-        func metadataOutput(_ output: AVCaptureMetadataOutput, didOutput metadataObjects: [AVMetadataObject], from connection: AVCaptureConnection) {
-            if let metadataObject = metadataObjects.first,
-               let readableObject = metadataObject as? AVMetadataMachineReadableCodeObject,
-               let code = readableObject.stringValue {
-                scannedCode = code
+    private var trailingToolbar: some ToolbarContent {
+        ToolbarItemGroup(placement: .navigationBarTrailing) {
+            if hasSelection {
+                Button(action: presentShare) {
+                    Image(systemName: "square.and.arrow.up")
+                }
+                Button(role: .destructive) { showDeleteSheet = true } label: {
+                    Image(systemName: "trash")
+                }
             }
         }
     }
+
+    // MARK: Логика ------------------------------------------------------------
+
+    /// Добавляем новый код в стор и даём тактильный отклик
+    private func addScanned(_ code: String?) {
+        guard let code, !scanStore.all.contains(where: { $0.text == code }) else { return }
+        scanStore.add(text: code, image: nil)
+        UINotificationFeedbackGenerator().notificationOccurred(.success)
+        viewModel.scannedCode = nil
+    }
+
+    /// Шаринг выбранных элементов (текст + изображения, если есть)
+    private func presentShare() {
+        let images = scanStore.selectedImages()
+        let texts  = scanStore.items
+            .filter { $0.isSelected }
+            .map(\.text)
+        guard !images.isEmpty || !texts.isEmpty else { return }
+
+        sharePayload = SharePayload(items: images + texts)
+    }
 }
 
-// MARK: - Предпросмотр
-struct QRScannerView_Previews: PreviewProvider {
-    static var previews: some View {
-        QRScannerView()
-    }
+
+#Preview {
+    QRScannerView()
+        .environmentObject(QRScanStore())
 }

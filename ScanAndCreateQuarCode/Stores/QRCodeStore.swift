@@ -5,74 +5,95 @@
 //  Created by Денис Рюмин on 01.07.2025.
 //
 
+import Foundation
 import SwiftUI
 
-// MARK: - Хранилище
+@MainActor
 final class QRCodeStore: ObservableObject {
-    @Published private(set) var items: [QRCodeItem] = []
-    
-    private var allItems: [QRCodeItem] = []
-    private let batchSize = 15
-    private var loadedCount = 0
-    
-    init() {
-        loadAllItems()
-        loadMoreItems()
+    @Published private(set) var all: [QRCodeItem] = []
+    @Published private(set) var visibleCount = 0           // ленивый скролл
+    private let batch = 15
+    private let key = "qrcodes"
+
+    // cрез, который реально отображается
+    var items: [QRCodeItem] { Array(all.prefix(visibleCount)) }
+
+    init() { Task { await loadAll() } }
+
+    // MARK: – Публичные методы ------------------------------------------------
+    func loadMore() {
+        guard visibleCount < all.count else { return }
+        visibleCount = min(visibleCount + batch, all.count)
     }
-    
-    // --- выбор
-    func setSelected(_ isSelected: Bool, forId id: UUID) {
-        guard let idx = items.firstIndex(where: { $0.id == id }) else { return }
-        items[idx].isSelected = isSelected
-    }
-    func selectAll()    { items.indices.forEach { items[$0].isSelected = true  } }
-    func deselectAll()  { items.indices.forEach { items[$0].isSelected = false } }
-    
-    // --- подгрузка
-    private func loadAllItems() {
-        if let data = UserDefaults.standard.data(forKey: "qrcodes"),
-           let decoded = try? JSONDecoder().decode([QRCodeItem].self, from: data) {
-            allItems = decoded.sorted { $0.text < $1.text }
-        }
-    }
-    func loadMoreItems() {
-        guard loadedCount < allItems.count else { return }
-        let next = allItems[loadedCount..<min(loadedCount + batchSize, allItems.count)]
-        items.append(contentsOf: next)
-        loadedCount += next.count
-    }
-    
-    // --- CRUD
+
     func addItem(text: String, image: UIImage) {
-        let new = QRCodeItem(text: text, imageData: image.pngData())
-        allItems.insert(new, at: 0)
-        items.insert(new, at: 0)
-        loadedCount += 1                  // ← фикс двойной генерации
-        saveAllItems()
+        let path = saveImageToDisk(image)
+        let new = QRCodeItem(text: text, imagePath: path)
+        all.insert(new, at: 0)
+            // делаем новый элемент видимым
+            if visibleCount < batch {
+                visibleCount += 1          // пока не заполнили первую страницу
+            }
+        save()
     }
-    
+
     func updateItem(_ id: UUID, newText: String) {
-        guard let allIdx   = allItems.firstIndex(where: { $0.id == id }),
-              let listIdx  = items.firstIndex(where: { $0.id == id }) else { return }
-        allItems[allIdx].text = newText
-        items[listIdx].text   = newText
-        saveAllItems()
-    }
-    
-    func deleteItem(_ id: UUID) {
-        allItems.removeAll { $0.id == id }
-        items.removeAll    { $0.id == id }
-        saveAllItems()
-    }
-    func deleteItem(at offsets: IndexSet) { offsets.map { items[$0].id }.forEach(deleteItem) }
-    func deleteSelected()                 { items.filter(\.isSelected).map(\.id).forEach(deleteItem) }
-    
-    // --- утилиты
-    func getSelectedImages() -> [UIImage] { items.compactMap { $0.isSelected ? $0.image : nil } }
-    
-    private func saveAllItems() {
-        if let encoded = try? JSONEncoder().encode(allItems) {
-            UserDefaults.standard.set(encoded, forKey: "qrcodes")
+        if let index = all.firstIndex(where: { $0.id == id }) {
+            all[index].text = newText
+            save()
         }
     }
+
+    func deleteItem(_ id: UUID) {
+        all.removeAll { $0.id == id }
+        save()
+    }
+    func deleteItem(at offsets: IndexSet) {
+        offsets.map { items[$0].id }.forEach(deleteItem)
+    }
+    func deleteSelected() {
+        items.filter(\.isSelected).map(\.id).forEach(deleteItem)
+    }
+
+    // выбор
+    func setSelected(_ isSelected: Bool, forId id: UUID) {
+        if let idx = all.firstIndex(where: { $0.id == id }) {
+            all[idx].isSelected = isSelected
+        }
+    }
+    func selectAll()   { all.indices.forEach { all[$0].isSelected = true  } }
+    func deselectAll() { all.indices.forEach { all[$0].isSelected = false } }
+
+    func getSelectedImages() -> [UIImage] {
+        items.compactMap { $0.isSelected ? $0.image : nil }
+    }
+
+    // MARK: – Private ---------------------------------------------------------
+    private func loadAll() async {
+        if let data = UserDefaults.standard.data(forKey: key),
+           let decoded = try? JSONDecoder().decode([QRCodeItem].self, from: data) {
+            all = decoded.sorted { $0.text < $1.text }
+        }
+        loadMore()
+    }
+
+    private func save() {
+        if let encoded = try? JSONEncoder().encode(all) {
+            UserDefaults.standard.set(encoded, forKey: key)
+        }
+    }
+
+    private func saveImageToDisk(_ image: UIImage) -> String? {
+        guard let data = image.pngData() else { return nil }
+        let url = FileManager.default.urls(for: .documentDirectory,
+                                           in: .userDomainMask)[0]
+            .appendingPathComponent(UUID().uuidString + ".png")
+        try? data.write(to: url, options: .atomic)
+        return url.path
+    }
+}
+
+// расширяем под протокол редактирования
+extension QRCodeStore: QRItemUpdatable {
+    func update(_ id: UUID, newText: String) { updateItem(id, newText: newText) }
 }

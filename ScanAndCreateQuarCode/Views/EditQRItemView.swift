@@ -7,22 +7,18 @@
 
 import SwiftUI
 
-/// Редактор текста QR-элемента, работает с любым Store,
-/// который является ObservableObject **и** реализует QRItemUpdatable.
 struct EditQRItemView<Store>: View where Store: ObservableObject & QRItemUpdatable {
     @Environment(\.dismiss) private var dismiss
-    
     let item: QRCodeItem
-    @ObservedObject var store: Store             // <- теперь проходит проверку
-    
+    @ObservedObject var store: Store
     @State private var editedText: String
-    
+
     init(item: QRCodeItem, store: Store) {
         self.item = item
         self.store = store
         _editedText = State(initialValue: item.text)
     }
-    
+
     var body: some View {
         NavigationStack {
             Form {

@@ -11,10 +11,11 @@ import SwiftUI
 struct QRCodeItem: Identifiable, Codable, Equatable {
     var id = UUID()
     var text: String
-    var imageData: Data?
+    var imagePath: String?           // заменено imageData на путь к файлу
     var isSelected: Bool = false
-    
+
     var image: UIImage? {
-        imageData.flatMap { UIImage(data: $0) }
+        guard let path = imagePath else { return nil }
+        return UIImage(contentsOfFile: path)
     }
 }
