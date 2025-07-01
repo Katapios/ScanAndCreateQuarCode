@@ -7,18 +7,20 @@
 
 import SwiftUI
 
+
 struct RootView: View {
+    @State private var tab = 0          // 0 = «Создать», 1 = «Сканировать»
     var body: some View {
-        TabView {
+        TabView(selection: $tab) {
             QRCodeGeneratorView()
                 .tabItem { Label("Создать", systemImage: "qrcode") }
-            
-            QRScannerView()                // ← новый экран
+                .tag(0)                 // <- теги
+
+            QRScannerView(tab: $tab)    // <- передаём binding
                 .tabItem { Label("Сканировать", systemImage: "viewfinder") }
+                .tag(1)
         }
     }
 }
 
-#Preview {
-    RootView()
-}
+

@@ -7,18 +7,20 @@
 
 import SwiftUI
 import AVFoundation
-import PhotosUI
+import CoreImage.CIFilterBuiltins        // 👈 для генерации QR
 
 struct QRScannerView: View {
     @EnvironmentObject private var scanStore: QRScanStore
+    @EnvironmentObject private var codeStore: QRCodeStore   // 👈 доступ к генератору
     @StateObject private var viewModel = QRScannerViewModel()
+    @Binding var tab: Int
 
     // UI-состояния
     @State private var editingItem: QRCodeItem?
     @State private var showDeleteSheet = false
-    @State private var sharePayload: SharePayload?        // для share-sheet
 
     private var hasSelection: Bool { scanStore.items.contains { $0.isSelected } }
+    private let ciContext = CIContext()
 
     var body: some View {
         NavigationStack {
@@ -33,9 +35,6 @@ struct QRScannerView: View {
             .sheet(item: $editingItem) { item in
                 // можем переиспользовать уже готовый редактор
                 EditQRItemView(item: item, store: scanStore)
-            }
-            .sheet(item: $sharePayload) { payload in
-                ActivityView(items: payload.items)
             }
             .confirmationDialog("Удалить выбранные QR-коды?",
                                 isPresented: $showDeleteSheet,
@@ -70,14 +69,18 @@ struct QRScannerView: View {
         }
     }
 
-    private var actionButtons: some View {
-        HStack {
-            Button("Выбрать все",  action: scanStore.selectAll).font(.caption)
-            Button("Снять выбор",  action: scanStore.deselectAll).font(.caption)
-        }
-        .padding(.vertical, 8)
-        .opacity(scanStore.items.isEmpty ? 0 : 1)
-    }
+        private var actionButtons: some View {
+            HStack {
+                Button("Выбрать все",  action: scanStore.selectAll).font(.caption)
+                Button("Снять выбор",  action: scanStore.deselectAll).font(.caption)
+    
+                Button("На главную") { moveSelectedToGenerator() }  // стало
+                    .font(.caption)
+                    .disabled(!hasSelection)
+            }
+             .padding(.vertical, 8)
+             .opacity(scanStore.items.isEmpty ? 0 : 1)
+         }
 
     private var codesScroll: some View {
         ScrollView {
@@ -101,18 +104,15 @@ struct QRScannerView: View {
         }
     }
 
-    private var trailingToolbar: some ToolbarContent {
-        ToolbarItemGroup(placement: .navigationBarTrailing) {
-            if hasSelection {
-                Button(action: presentShare) {
-                    Image(systemName: "square.and.arrow.up")
-                }
-                Button(role: .destructive) { showDeleteSheet = true } label: {
-                    Image(systemName: "trash")
+        private var trailingToolbar: some ToolbarContent {
+            ToolbarItemGroup(placement: .navigationBarTrailing) {
+                if hasSelection {
+                    Button(role: .destructive) { showDeleteSheet = true } label: {
+                        Image(systemName: "trash")
+                    }
                 }
             }
-        }
-    }
+         }
 
     // MARK: Логика ------------------------------------------------------------
 
@@ -123,21 +123,39 @@ struct QRScannerView: View {
         UINotificationFeedbackGenerator().notificationOccurred(.success)
         viewModel.scannedCode = nil
     }
+    
+    // MARK: – Перенос выбранных кодов в генератор -------------------------------
+    private func moveSelectedToGenerator() {
+        let selected = scanStore.items.filter(\.isSelected)
 
-    /// Шаринг выбранных элементов (текст + изображения, если есть)
-    private func presentShare() {
-        let images = scanStore.selectedImages()
-        let texts  = scanStore.items
-            .filter { $0.isSelected }
-            .map(\.text)
-        guard !images.isEmpty || !texts.isEmpty else { return }
+        for item in selected {
+            guard !codeStore.all.contains(where: { $0.text == item.text }) else { continue }
+            if let qr = makeQR(from: item.text) {
+                codeStore.addItem(text: item.text, image: qr)
+            }
+        }
 
-        sharePayload = SharePayload(items: images + texts)
+        codeStore.loadMore()         // ← важная строка
+        scanStore.deselectAll()
+        tab = 0                      // переключаемся на генератор
+    }
+
+    /// Генерирует QR-картинку из текста
+    private func makeQR(from text: String) -> UIImage? {
+        let filter = CIFilter.qrCodeGenerator()
+        filter.setValue(Data(text.utf8), forKey: "inputMessage")
+        guard let output = filter.outputImage else { return nil }
+
+        let scaled = output.transformed(by: .init(scaleX: 10, y: 10))
+        guard let cg = ciContext.createCGImage(scaled, from: scaled.extent) else { return nil }
+
+        return UIImage(cgImage: cg)
     }
 }
 
 
 #Preview {
-    QRScannerView()
+    QRScannerView(tab: .constant(1))
         .environmentObject(QRScanStore())
+        .environmentObject(QRCodeStore())   // нужен и второй стор
 }
