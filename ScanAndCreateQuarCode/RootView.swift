@@ -10,17 +10,11 @@ import SwiftUI
 struct RootView: View {
     var body: some View {
         TabView {
-            // 1. Генератор
             QRCodeGeneratorView()
-                .tabItem {
-                    Label("Создать", systemImage: "qrcode")
-                }
-
-            // 2. Сканер (пока заглушка)
-            QRScannerPlaceholderView()
-                .tabItem {
-                    Label("Сканировать", systemImage: "viewfinder")
-                }
+                .tabItem { Label("Создать", systemImage: "qrcode") }
+            
+            QRScannerView()                // ← новый экран
+                .tabItem { Label("Сканировать", systemImage: "viewfinder") }
         }
     }
 }
