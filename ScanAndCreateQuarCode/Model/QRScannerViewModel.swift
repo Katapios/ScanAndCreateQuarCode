@@ -5,43 +5,63 @@
 //  Created by Денис Рюмин on 01.07.2025.
 //
 
-import SwiftUI
 import AVFoundation
+import SwiftUI
 
-@MainActor
-class QRScannerViewModel: ObservableObject {
-    @Published var scannedCode: String?
-    @Published var statusMessage = "Наведите камеру на QR-код"
-    @Published var statusColor: Color = .primary
+class QRScannerViewModel: NSObject, ObservableObject, AVCaptureMetadataOutputObjectsDelegate {
+    @Published var scannedCode: String? = nil
+    private let session = AVCaptureSession()
+    private var previewLayer: AVCaptureVideoPreviewLayer?
+    private var lastScannedCode: String?
 
-    func checkCameraAuthorization() {
-        switch AVCaptureDevice.authorizationStatus(for: .video) {
-        case .authorized:
-            statusMessage = "Камера доступна"
-            statusColor = .green
-        case .notDetermined:
-            requestCameraAccess()
-        case .denied, .restricted:
-            statusMessage = "Нет доступа к камере. Проверьте настройки."
-            statusColor = .red
-        @unknown default:
-            statusMessage = "Неизвестный статус доступа"
-            statusColor = .orange
+    func setupSession() {
+        guard session.inputs.isEmpty else { return }
+        guard let videoDevice = AVCaptureDevice.default(for: .video),
+              let videoInput = try? AVCaptureDeviceInput(device: videoDevice) else { return }
+        if session.canAddInput(videoInput) { session.addInput(videoInput) }
+
+        let metadataOutput = AVCaptureMetadataOutput()
+        if session.canAddOutput(metadataOutput) {
+            session.addOutput(metadataOutput)
+            metadataOutput.setMetadataObjectsDelegate(self, queue: DispatchQueue.main)
+            metadataOutput.metadataObjectTypes = [.qr]
         }
     }
 
-    private func requestCameraAccess() {
-        AVCaptureDevice.requestAccess(for: .video) { granted in
-            Task { @MainActor in
-                if granted {
-                    self.statusMessage = "Камера доступна"
-                    self.statusColor = .green
-                } else {
-                    self.statusMessage = "Доступ к камере запрещен"
-                    self.statusColor = .red
-                }
+    func startSession() {
+        if !session.isRunning {
+            session.startRunning()
+        }
+    }
+
+    func stopSession() {
+        if session.isRunning {
+            session.stopRunning()
+        }
+    }
+
+    func makePreviewLayer() -> AVCaptureVideoPreviewLayer {
+        if let previewLayer = previewLayer { return previewLayer }
+        let layer = AVCaptureVideoPreviewLayer(session: session)
+        layer.videoGravity = .resizeAspectFill
+        previewLayer = layer
+        return layer
+    }
+
+    func metadataOutput(_ output: AVCaptureMetadataOutput, didOutput metadataObjects: [AVMetadataObject], from connection: AVCaptureConnection) {
+        if let object = metadataObjects.first as? AVMetadataMachineReadableCodeObject,
+           let stringValue = object.stringValue {
+            // Only set if different from last scanned
+            if lastScannedCode != stringValue {
+                scannedCode = stringValue
+                lastScannedCode = stringValue
             }
         }
     }
-}
 
+    // Call this after processing the code in your view
+    func resetScannedCode() {
+        scannedCode = nil
+        lastScannedCode = nil
+    }
+}
