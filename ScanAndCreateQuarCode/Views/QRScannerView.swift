@@ -40,6 +40,9 @@ struct QRScannerView: View {
                 codesScroll
             }
             .toolbar { trailingToolbar }
+            .sheet(item: $editingItem) { item in
+                EditQRItemView(item: item, store: scanStore)
+            }
             .confirmationDialog("Удалить выбранные QR-коды?",
                                 isPresented: $showDeleteSheet,
                                 titleVisibility: .visible) {
