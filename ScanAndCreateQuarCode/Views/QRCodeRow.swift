@@ -49,7 +49,7 @@ struct QRCodeRow: View {
                 Divider()
             }
         }
-        .padding(.vertical, 4)
+        .padding(.horizontal, 20)
         .contextMenu {
             Button { isSelected.toggle() } label: {
                 Label(isSelected ? "Снять выбор" : "Выбрать",

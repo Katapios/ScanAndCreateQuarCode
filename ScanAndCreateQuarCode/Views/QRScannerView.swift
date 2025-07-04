@@ -64,7 +64,7 @@ struct QRScannerView: View {
                 Spacer()
                 Text(viewModel.statusMessage)
                     .foregroundColor(viewModel.statusColor)
-                    .padding(.bottom, 12)
+                    .padding(.bottom, 150)
             }
         }
     }
