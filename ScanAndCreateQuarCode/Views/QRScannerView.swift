@@ -23,22 +23,46 @@ struct QRScannerView: View {
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 0) {
+            VStack(spacing: 16) {
+                VStack(spacing: 8) {
+                    Text("QR Code Scanner")
+                        .font(.title2).bold()
+                        .foregroundColor(.primary)
+                    Text("Сканируйте QR-коды для добавления в коллекцию.")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                }
+                .padding(.top, 16)
+
                 CameraPreview(session: viewModel)
                     .frame(height: 220)
-                    .background(Color.black.opacity(0.85))
-                    .cornerRadius(18)
-                    .shadow(radius: 8)
-                    .padding(.top, 24)
+                    .background(.ultraThinMaterial)
+                    .cornerRadius(20)
+                    .shadow(color: .black.opacity(0.15), radius: 10, y: 4)
                     .padding(.horizontal, 24)
                     .onAppear {
                         viewModel.setupSession()
                         viewModel.startSession()
                     }
-                    // .onDisappear { viewModel.stopSession() } // REMOVE or COMMENT OUT THIS LINE
+
                 actionButtons
-                codesScroll
+
+                if scanStore.items.isEmpty {
+                    Spacer()
+                    VStack(spacing: 8) {
+                        Image(systemName: "qrcode.viewfinder")
+                            .font(.system(size: 48))
+                            .foregroundColor(.secondary)
+                        Text("Нет отсканированных кодов")
+                            .font(.headline)
+                            .foregroundColor(.secondary)
+                    }
+                    Spacer()
+                } else {
+                    codesScroll
+                }
             }
+            .padding(.bottom, 8)
             .toolbar { trailingToolbar }
             .sheet(item: $editingItem) { item in
                 EditQRItemView(item: item, store: scanStore)
@@ -52,6 +76,7 @@ struct QRScannerView: View {
                 addScanned(code)
                 viewModel.resetScannedCode()
             }
+            .background(Color(.systemGroupedBackground).ignoresSafeArea())
         }
         .edgesIgnoringSafeArea(.top)
     }
@@ -107,7 +132,7 @@ struct QRScannerView: View {
             let layer = AVCaptureVideoPreviewLayer(session: session)
             layer.videoGravity = .resizeAspectFill
             return layer
-            previewLayer = layer
+//            previewLayer = layer
         }
 
         func metadataOutput(_ output: AVCaptureMetadataOutput, didOutput metadataObjects: [AVMetadataObject], from connection: AVCaptureConnection) {

@@ -13,41 +13,39 @@ struct QRCodeRow: View {
     var onEdit: () -> Void
 
     var body: some View {
-        HStack {
+        HStack(alignment: .center) {
             Button { isSelected.toggle() } label: {
                 Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
                     .foregroundStyle(isSelected ? .blue : .gray)
             }
             .buttonStyle(.plain)
 
-            VStack(alignment: .leading, spacing: 8) {
-                HStack(alignment: .top) {
-                    if let image = item.image {
-                        Image(uiImage: image)
-                            .resizable()
-                            .interpolation(.none)
-                            .scaledToFit()
-                            .frame(width: 60, height: 60)
-                            .background(Color.white)
-                            .cornerRadius(6)
-                            .shadow(radius: 1)
-                            .drawingGroup()          // кеш слоя
-                    }
-
-                    Text(item.text)
-                        .lineLimit(2)
-                        .padding(.vertical, 8)
-
-                    Spacer(minLength: 0)
-
-                    Button(action: onEdit) {
-                        Image(systemName: "pencil")
-                            .foregroundStyle(.blue)
-                    }
-                    .buttonStyle(.plain)
-                }
-                Divider()
+            if let image = item.image {
+                Image(uiImage: image)
+                    .resizable()
+                    .interpolation(.none)
+                    .scaledToFit()
+                    .frame(width: 60, height: 60)
+                    .background(Color.white)
+                    .cornerRadius(6)
+                    .shadow(radius: 1)
+                    .drawingGroup()
             }
+
+            Text(item.text)
+                .lineLimit(2)
+                .padding(.vertical, 8)
+
+            Spacer(minLength: 0)
+
+            Button(action: { onEdit() }) {
+                Image(systemName: "pencil")
+                    .foregroundColor(.accentColor)
+                    .font(.system(size: 18, weight: .medium))
+                    .frame(width: 28, height: 28)
+            }
+            .buttonStyle(.plain)
+            .padding(.trailing, 8)
         }
         .padding(.horizontal, 20)
         .contextMenu {
