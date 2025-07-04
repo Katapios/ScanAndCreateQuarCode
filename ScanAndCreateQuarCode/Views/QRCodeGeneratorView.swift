@@ -11,19 +11,17 @@ import PhotosUI
 
 struct QRCodeGeneratorView: View {
     @EnvironmentObject private var store: QRCodeStore
+    @StateObject private var viewModel = QRCodeGeneratorViewModel()
 
     @State private var newText = ""
     @State private var editingItem: QRCodeItem?
     @State private var showDeleteSheet = false
-    @State private var showSaveAlert  = false
-    @State private var saveAlertMsg   = ""
     @State private var shareItems: [Any] = []
     @State private var sharePayload: SharePayload?
-    @State private var imageSaver: ImageSaver?
     @FocusState private var isInputFocused: Bool
 
     private var hasSelection: Bool { store.items.contains { $0.isSelected } }
-    private let ciContext = CIContext()          // единый контекст
+    private let ciContext = CIContext()
 
     var body: some View {
         NavigationStack {
@@ -57,16 +55,16 @@ struct QRCodeGeneratorView: View {
                                 titleVisibility: .visible) {
                 Button("Удалить", role: .destructive, action: store.deleteSelected)
             }
-            .alert("Сохранение", isPresented: $showSaveAlert) {
-                Button("OK", role: .cancel) { }
-            } message: { Text(saveAlertMsg) }
         }
+        .alert("Сохранение", isPresented: $viewModel.showSaveAlert) {
+            Button("OK", role: .cancel) { }
+        } message: { Text(viewModel.saveAlertMsg) }
         .simultaneousGesture(
             TapGesture().onEnded { isInputFocused = false }
         )
     }
 
-    // MARK: – UI-секции -------------------------------------------------------
+    // MARK: – UI-секции
 
     private var inputSection: some View {
         HStack(spacing: 12) {
@@ -121,7 +119,7 @@ struct QRCodeGeneratorView: View {
         }
     }
 
-    // MARK: – Логика ----------------------------------------------------------
+    // MARK: – Логика
 
     private func generateQR() async {
         let text = newText.trimmingCharacters(in: .whitespaces)
@@ -142,36 +140,13 @@ struct QRCodeGeneratorView: View {
     private func presentShareSheet() {
         let images = store.getSelectedImages()
         guard !images.isEmpty else { return }
-        sharePayload = SharePayload(items: images)      // новый экземпляр
+        sharePayload = SharePayload(items: images)
     }
 
     private func saveSelectedToGallery() {
         let images = store.getSelectedImages()
-        guard !images.isEmpty else { return }
-
-        func startSaving() {
-            let saver = ImageSaver(total: images.count) { ok, fail in
-                saveAlertMsg = "Сохранено \(ok) из \(images.count). Ошибок: \(fail)"
-                showSaveAlert = true
-                store.deselectAll()
-                imageSaver = nil
-            }
-            imageSaver = saver
-            images.forEach { saver.writeToPhotoAlbum(image: $0) }
-        }
-
-        switch PHPhotoLibrary.authorizationStatus(for: .addOnly) {
-        case .authorized, .limited:
-            startSaving()
-        case .notDetermined:
-            PHPhotoLibrary.requestAuthorization(for: .addOnly) { status in
-                if status == .authorized || status == .limited {
-                    DispatchQueue.main.async { startSaving() }
-                }
-            }
-        default:
-            saveAlertMsg = "Доступ к Фото запрещён. Разреши в Настройках."
-            showSaveAlert = true
+        viewModel.saveSelectedToGallery(images: images) {
+            store.deselectAll()
         }
     }
 }
