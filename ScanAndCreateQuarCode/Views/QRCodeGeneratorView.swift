@@ -25,13 +25,60 @@ struct QRCodeGeneratorView: View {
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 0) {
-                inputSection
-                Divider()
+            VStack(spacing: 16) {
+                VStack(spacing: 8) {
+                    Text("QR Code Generator")
+                        .font(.title2).bold()
+                        .foregroundColor(.primary)
+                    Text("Создавайте QR-коды для текстов и ссылок.")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                }
+                .padding(.top, 16)
+
+                VStack {
+                    HStack(spacing: 12) {
+                        TextField("Введите текст или ссылку", text: $newText)
+                            .textFieldStyle(.roundedBorder)
+                            .submitLabel(.done)
+                            .focused($isInputFocused)
+                            .onSubmit { Task { await generateQR() } }
+                        Button { Task { await generateQR() } } label: {
+                            Image(systemName: "qrcode")
+                                .font(.system(size: 24))
+                                .frame(width: 44, height: 44)
+                                .background(Color.blue)
+                                .foregroundStyle(.white)
+                                .clipShape(Circle())
+                        }
+                        .disabled(newText.trimmingCharacters(in: .whitespaces).isEmpty)
+                    }
+                    .padding()
+                }
+                .background(.ultraThinMaterial)
+                .cornerRadius(20)
+                .shadow(color: .black.opacity(0.15), radius: 10, y: 4)
+                .padding(.horizontal, 24)
+
                 actionButtons
-                codesScroll
+
+                if store.items.isEmpty {
+                    Spacer()
+                    VStack(spacing: 8) {
+                        Image(systemName: "qrcode")
+                            .font(.system(size: 48))
+                            .foregroundColor(.secondary)
+                        Text("Нет созданных QR-кодов")
+                            .font(.headline)
+                            .foregroundColor(.secondary)
+                    }
+                    Spacer()
+                } else {
+                    codesScroll
+                }
             }
-            .navigationTitle("QR Generator")
+            .padding(.bottom, 8)
+            .navigationTitle("")
             .toolbar {
                 ToolbarItemGroup(placement: .navigationBarTrailing) {
                     if hasSelection {
@@ -55,6 +102,7 @@ struct QRCodeGeneratorView: View {
                                 titleVisibility: .visible) {
                 Button("Удалить", role: .destructive, action: store.deleteSelected)
             }
+            .background(Color(.systemGroupedBackground).ignoresSafeArea())
         }
         .alert("Сохранение", isPresented: $viewModel.showSaveAlert) {
             Button("OK", role: .cancel) { }
@@ -65,27 +113,6 @@ struct QRCodeGeneratorView: View {
     }
 
     // MARK: – UI-секции
-
-    private var inputSection: some View {
-        HStack(spacing: 12) {
-            TextField("Enter text or URL", text: $newText)
-                .textFieldStyle(.roundedBorder)
-                .submitLabel(.done)
-                .focused($isInputFocused)
-                .onSubmit { Task { await generateQR() } }
-
-            Button { Task { await generateQR() } } label: {
-                Image(systemName: "qrcode")
-                    .font(.system(size: 24))
-                    .frame(width: 44, height: 44)
-                    .background(Color.blue)
-                    .foregroundStyle(.white)
-                    .clipShape(Circle())
-            }
-            .disabled(newText.trimmingCharacters(in: .whitespaces).isEmpty)
-        }
-        .padding()
-    }
 
     private var actionButtons: some View {
         HStack {

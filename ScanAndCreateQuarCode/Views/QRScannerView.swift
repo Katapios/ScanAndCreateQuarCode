@@ -117,7 +117,9 @@ struct QRScannerView: View {
 
         func startSession() {
             if !session.isRunning {
-                session.startRunning()
+                DispatchQueue.global(qos: .userInitiated).async { [self] in
+                    session.startRunning()
+                }
             }
         }
 
