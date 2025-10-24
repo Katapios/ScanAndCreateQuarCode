@@ -20,7 +20,7 @@ struct EditQRItemView<Store>: View where Store: ObservableObject & QRItemUpdatab
     }
 
     var body: some View {
-        NavigationStack {
+        NavigationView {
             Form {
                 Section {
                     TextField("Текст", text: $editedText)
@@ -51,5 +51,6 @@ struct EditQRItemView<Store>: View where Store: ObservableObject & QRItemUpdatab
                 }
             }
         }
+        .navigationViewStyle(StackNavigationViewStyle())
     }
 }

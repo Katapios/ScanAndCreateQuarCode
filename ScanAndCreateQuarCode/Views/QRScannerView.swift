@@ -22,7 +22,7 @@ struct QRScannerView: View {
     private let ciContext = CIContext()
 
     var body: some View {
-        NavigationStack {
+        NavigationView {
             VStack(spacing: 16) {
                 VStack(spacing: 8) {
                     Text("QR Code Scanner")
@@ -78,6 +78,7 @@ struct QRScannerView: View {
             }
             .background(Color(.systemGroupedBackground).ignoresSafeArea())
         }
+        .navigationViewStyle(StackNavigationViewStyle())
         .edgesIgnoringSafeArea(.top)
     }
 

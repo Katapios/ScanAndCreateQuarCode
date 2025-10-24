@@ -24,7 +24,7 @@ struct QRCodeGeneratorView: View {
     private let ciContext = CIContext()
 
     var body: some View {
-        NavigationStack {
+        NavigationView {
             VStack(spacing: 16) {
                 VStack(spacing: 8) {
                     Text("QR Code Generator")
@@ -104,6 +104,7 @@ struct QRCodeGeneratorView: View {
             }
             .background(Color(.systemGroupedBackground).ignoresSafeArea())
         }
+        .navigationViewStyle(StackNavigationViewStyle())
         .alert("Сохранение", isPresented: $viewModel.showSaveAlert) {
             Button("OK", role: .cancel) { }
         } message: { Text(viewModel.saveAlertMsg) }

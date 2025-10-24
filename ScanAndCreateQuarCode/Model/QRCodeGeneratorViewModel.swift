@@ -27,18 +27,35 @@ class QRCodeGeneratorViewModel: ObservableObject {
             images.forEach { saver.writeToPhotoAlbum(image: $0) }
         }
 
-        switch PHPhotoLibrary.authorizationStatus(for: .addOnly) {
-        case .authorized, .limited:
-            startSaving()
-        case .notDetermined:
-            PHPhotoLibrary.requestAuthorization(for: .addOnly) { status in
-                if status == .authorized || status == .limited {
-                    DispatchQueue.main.async { startSaving() }
+        if #available(iOS 16.0, *) {
+            switch PHPhotoLibrary.authorizationStatus(for: .addOnly) {
+            case .authorized, .limited:
+                startSaving()
+            case .notDetermined:
+                PHPhotoLibrary.requestAuthorization(for: .addOnly) { status in
+                    if status == .authorized || status == .limited {
+                        DispatchQueue.main.async { startSaving() }
+                    }
                 }
+            default:
+                self.saveAlertMsg = "Доступ к Фото запрещён. Разреши в Настройках."
+                self.showSaveAlert = true
             }
-        default:
-            self.saveAlertMsg = "Доступ к Фото запрещён. Разреши в Настройках."
-            self.showSaveAlert = true
+        } else {
+            // Для iOS 15 используем старый API
+            switch PHPhotoLibrary.authorizationStatus() {
+            case .authorized, .limited:
+                startSaving()
+            case .notDetermined:
+                PHPhotoLibrary.requestAuthorization { status in
+                    if status == .authorized || status == .limited {
+                        DispatchQueue.main.async { startSaving() }
+                    }
+                }
+            default:
+                self.saveAlertMsg = "Доступ к Фото запрещён. Разреши в Настройках."
+                self.showSaveAlert = true
+            }
         }
     }
 }
