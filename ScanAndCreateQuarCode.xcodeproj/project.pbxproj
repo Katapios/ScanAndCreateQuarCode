@@ -257,6 +257,7 @@
 				DEVELOPMENT_TEAM = H2GFBK2X44;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "QR-кот";
 				INFOPLIST_KEY_NSCameraUsageDescription = "Камера используется для сканирования QR-кодов";
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "Позвольте сохранять QR-коды в Фото";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -289,6 +290,7 @@
 				DEVELOPMENT_TEAM = H2GFBK2X44;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "QR-кот";
 				INFOPLIST_KEY_NSCameraUsageDescription = "Камера используется для сканирования QR-кодов";
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "Позвольте сохранять QR-коды в Фото";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
